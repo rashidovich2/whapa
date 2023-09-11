@@ -97,24 +97,23 @@ class WaBackup:
 
                 print("Requesting access to Google by OAuth cookie...")
                 token = gpsoauth.perform_master_login_oauth(email=gmail, oauth_token=oauth_token, android_id=android_id)
-                if "Token" not in token:
-                    error(token)
-                    quit()
-                else:
+                if "Token" in token:
                     print("Granted.")
                     print("Writing Token in your settings.cfg file...")
-                    cfg_file = r'{}/cfg/settings.cfg'.format(whapa_path).replace("/", os.path.sep)
+                    cfg_file = f'{whapa_path}/cfg/settings.cfg'.replace("/", os.path.sep)
                     config = ConfigObj(cfg_file, interpolation=None)
                     config['google-auth']['oauth'] = token['Token']
                     config.write()
                     oauth_token = token['Token']
-            else:
-                if "Token" not in token:
+                else:
                     error(token)
                     quit()
-                else:
-                    print("Granted.")
-                    oauth_token = token['Token']
+            elif "Token" not in token:
+                error(token)
+                quit()
+            else:
+                print("Granted.")
+                oauth_token = token['Token']
 
         print("Requesting authentication for Google Drive...")
         auth = gpsoauth.perform_oauth(
@@ -136,8 +135,8 @@ class WaBackup:
 
     def get(self, path, params=None, **kwargs):
         response = requests.get(
-            "https://backup.googleapis.com/v1/{}".format(path),
-            headers={"Authorization": "Bearer {}".format(Auth["Auth"])},
+            f"https://backup.googleapis.com/v1/{path}",
+            headers={"Authorization": f'Bearer {Auth["Auth"]}'},
             params=params,
             **kwargs,
         )
@@ -152,8 +151,7 @@ class WaBackup:
         page_token = None
         while True:
             page = self.get_page(path, page_token)
-            for item in page[last_component]:
-                yield item
+            yield from page[last_component]
             if "nextPageToken" not in page:
                 break
             page_token = page["nextPageToken"]
@@ -162,7 +160,7 @@ class WaBackup:
         return self.list_path("clients/wa/backups")
 
     def backup_files(self, backup):
-        return self.list_path("{}/files".format(backup["name"]))
+        return self.list_path(f'{backup["name"]}/files')
 
 
 def banner():
@@ -191,7 +189,7 @@ def help():
 def createSettingsFile():
     """ Function that creates the settings file """
 
-    cfg_file = r'{}/cfg/settings.cfg'.format(whapa_path).replace("/", os.path.sep)
+    cfg_file = f'{whapa_path}/cfg/settings.cfg'.replace("/", os.path.sep)
     with open(cfg_file, 'w') as cfg:
         cfg.write(dedent("""
             [report]
@@ -220,7 +218,7 @@ def createSettingsFile():
 
 
 def getConfigs():
-    cfg_file = r'{}/cfg/settings.cfg'.format(whapa_path).replace("/", os.path.sep)
+    cfg_file = f'{whapa_path}/cfg/settings.cfg'.replace("/", os.path.sep)
     config = ConfigObj(cfg_file, interpolation=None)
     try:
         gmail = config['google-auth']['gmail']
@@ -230,7 +228,7 @@ def getConfigs():
         android_id = config['google-auth']['android_id']
         if not password:
             try:
-                password = getpass("Enter your password for {}: ".format(gmail))
+                password = getpass(f"Enter your password for {gmail}: ")
             except KeyboardInterrupt:
                 quit('\nCancelled!')
 
@@ -244,7 +242,7 @@ def getConfigs():
 
     except Exception as e:
         print(e)
-        quit('The "{}" file is missing or corrupt!'.format(cfg_file))
+        quit(f'The "{cfg_file}" file is missing or corrupt!')
 
 
 def human_size(size):
@@ -252,24 +250,44 @@ def human_size(size):
         if abs(size) < 1024:
             break
         size = int(size / 1024)
-    return "({} {})".format(size, s)
+    return f"({size} {s})"
 
 
 def backup_info(backup):
     try:
-        print("[i] Backup name     : {}".format(backup["name"]))
-        print("[-] Whatsapp version: {}".format(json.loads(backup["metadata"]).get("versionOfAppWhenBackup")))
-        print("[-] Backup protected: {}".format(json.loads(backup["metadata"]).get("passwordProtectedBackupEnabled")))
-        print("[-] Backup upload   : {}".format(backup["updateTime"]))
-        print("[-] Backup size     : {} Bytes {}".format(backup["sizeBytes"], human_size(int(backup["sizeBytes"]))))
+        print(f'[i] Backup name     : {backup["name"]}')
+        print(
+            f'[-] Whatsapp version: {json.loads(backup["metadata"]).get("versionOfAppWhenBackup")}'
+        )
+        print(
+            f'[-] Backup protected: {json.loads(backup["metadata"]).get("passwordProtectedBackupEnabled")}'
+        )
+        print(f'[-] Backup upload   : {backup["updateTime"]}')
+        print(
+            f'[-] Backup size     : {backup["sizeBytes"]} Bytes {human_size(int(backup["sizeBytes"]))}'
+        )
         print("[+] Backup metadata")
-        print("    [-] Backup Frequency         : {} ".format(json.loads(backup["metadata"]).get("backupFrequency")))
-        print("    [-] Backup Network Settings  : {} ".format(json.loads(backup["metadata"]).get("backupNetworkSettings")))
-        print("    [-] Backup Version           : {} ".format(json.loads(backup["metadata"]).get("backupVersion")))
-        print("    [-] Include Videos In Backup : {} ".format(json.loads(backup["metadata"]).get("includeVideosInBackup")))
-        print("    [-] Num Of Photos            : {}".format(json.loads(backup["metadata"]).get("numOfPhotos")))
-        print("    [-] Num Of Media Files       : {}".format(json.loads(backup["metadata"]).get("numOfMediaFiles")))
-        print("    [-] Num Of Messages          : {}".format(json.loads(backup["metadata"]).get("numOfMessages")))
+        print(
+            f'    [-] Backup Frequency         : {json.loads(backup["metadata"]).get("backupFrequency")} '
+        )
+        print(
+            f'    [-] Backup Network Settings  : {json.loads(backup["metadata"]).get("backupNetworkSettings")} '
+        )
+        print(
+            f'    [-] Backup Version           : {json.loads(backup["metadata"]).get("backupVersion")} '
+        )
+        print(
+            f'    [-] Include Videos In Backup : {json.loads(backup["metadata"]).get("includeVideosInBackup")} '
+        )
+        print(
+            f'    [-] Num Of Photos            : {json.loads(backup["metadata"]).get("numOfPhotos")}'
+        )
+        print(
+            f'    [-] Num Of Media Files       : {json.loads(backup["metadata"]).get("numOfMediaFiles")}'
+        )
+        print(
+            f'    [-] Num Of Messages          : {json.loads(backup["metadata"]).get("numOfMessages")}'
+        )
         print("    [-] Video Size               : {} Bytes {}".format(json.loads(backup["metadata"]).get("videoSize"),
                                                                       human_size(int(
                                                                           json.loads(backup["metadata"]).get("videoSize")))))
@@ -298,7 +316,7 @@ def error(token):
             "3. Update requirements, use in a terminal: 'pip3 install --upgrade -r ./doc/requirements.txt' or 'pip install --upgrade -r ./doc/requirements.txt\n"
             "4. Your OAuth token configured in the settings file may have expired. The token will be deleted and you will have to log in again.")
 
-        cfg_file = r'{}/cfg/settings.cfg'.format(whapa_path).replace("/", os.path.sep)
+        cfg_file = f'{whapa_path}/cfg/settings.cfg'.replace("/", os.path.sep)
         config = ConfigObj(cfg_file, interpolation=None)
         config['google-auth']['oauth'] = ""
         config.write()
@@ -327,13 +345,13 @@ def get_file(passed_file: str, is_dry_run: bool):
     file_short = os.path.sep.join(passed_file.split("/")[3:])
     if is_dry_run:
 
-        print("    [-] Skipped (Dry Run): {}".format(passed_file))
+        print(f"    [-] Skipped (Dry Run): {passed_file}")
 
     else:
         response = requests.get(
-            "https://backup.googleapis.com/v1/{}?alt=media".format(passed_file),
-            headers={"Authorization": "Bearer {}".format(Auth["Auth"])},
-            stream=True
+            f"https://backup.googleapis.com/v1/{passed_file}?alt=media",
+            headers={"Authorization": f'Bearer {Auth["Auth"]}'},
+            stream=True,
         )
         if response.status_code == 200:
             passed_file = output_folder + file_short
@@ -342,15 +360,15 @@ def get_file(passed_file: str, is_dry_run: bool):
                 with open(passed_file, "bw") as destination:
                     for chunk in response.iter_content(chunk_size=None):
                         destination.write(chunk)
-                print("    [-] Downloaded: {}".format(passed_file))
+                print(f"    [-] Downloaded: {passed_file}")
                 total_size = len(response.content)
                 num_files += 1
 
             else:
-                print("    [-] Skipped: {}".format(passed_file))
+                print(f"    [-] Skipped: {passed_file}")
 
         else:
-            print("    [-] Not downloaded: {}".format(passed_file))
+            print(f"    [-] Not downloaded: {passed_file}")
 
 
 def get_multiple_files(drives, files_dict: dict, is_dry_run: bool):
@@ -365,16 +383,12 @@ def get_multiple_files(drives, files_dict: dict, is_dry_run: bool):
                   "Thread-31", "Thread-32", "Thread-33", "Thread-34", "Thread-35", "Thread-36", "Thread-37",
                   "Thread-38", "Thread-39", "Thread-40"]
     threads = []
-    threadID = 1
     print("[i] Generating threads...")
-    print("[+] Backup name : {}".format(drives["name"]))
-    for tName in threadList:
+    print(f'[+] Backup name : {drives["name"]}')
+    for threadID, tName in enumerate(threadList, start=1):
         thread = MyThread(threadID, tName, workQueue, is_dry_run=is_dry_run)
         thread.start()
         threads.append(thread)
-        threadID += 1
-
-    n = 1
     lenfiles = len(files_dict)
     queueLock.acquire()
 
@@ -382,13 +396,11 @@ def get_multiple_files(drives, files_dict: dict, is_dry_run: bool):
     if not output_folder:
         output_folder = os.getcwd()
 
-    for entry, size in files_dict.items():
+    for n, (entry, size) in enumerate(files_dict.items(), start=1):
         file_name = os.path.sep.join(entry.split("/")[3:])
-        local_store = (output_folder + "/" + file_name).replace("/", os.path.sep)
+        local_store = f"{output_folder}/{file_name}".replace("/", os.path.sep)
         workQueue.put(
             {'bearer': Auth["Auth"], 'url': entry, 'local': local_store, 'now': n, 'lenfiles': lenfiles, 'size': size})
-        n += 1
-
     queueLock.release()
     while not workQueue.empty():
         pass
@@ -399,7 +411,6 @@ def get_multiple_files(drives, files_dict: dict, is_dry_run: bool):
 
 
 def get_multiple_files_with_out_threads(files_dict: dict, is_dry_run: bool):
-    file_index: int = 1
     total_files: int = len(files_dict)
 
     output_folder: str = args.output
@@ -410,43 +421,41 @@ def get_multiple_files_with_out_threads(files_dict: dict, is_dry_run: bool):
     total_size = 0
     num_files = 0
 
-    for file_url, file_size in files_dict.items():
+    for file_index, (file_url, file_size) in enumerate(files_dict.items(), start=1):
         file_name = os.path.sep.join(file_url.split("/")[3:])
-        local_file_path = (output_folder + "/" + file_name).replace("/", os.path.sep)
+        local_file_path = f"{output_folder}/{file_name}".replace("/", os.path.sep)
         if os.path.isfile(local_file_path) and os.path.getsize(local_file_path) == file_size:
-            print("    [-] Number: {}/{} - {} : Already Exists".format(file_index, total_files, local_file_path))
+            print(
+                f"    [-] Number: {file_index}/{total_files} - {local_file_path} : Already Exists"
+            )
+
+        elif is_dry_run:
+            print(f"    [-] Skipped (Dry Run): {local_file_path}")
 
         else:
-            if is_dry_run:
-                print("    [-] Skipped (Dry Run): {}".format(local_file_path))
+            response: Response = requests.get(
+                f"https://backup.googleapis.com/v1/{file_url}?alt=media",
+                headers={"Authorization": f'Bearer {Auth["Auth"]}'},
+                stream=True,
+            )
+            if response.status_code == 200:
+
+                os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+                destination: io.BufferedWriter
+                with open(local_file_path, "bw") as destination:
+                    chunk: bytes
+                    for chunk in response.iter_content(chunk_size=None):
+                        destination.write(chunk)
+                print(
+                    f"    [-] Number: {file_index}/{total_files} - {local_file_path} : Download Success"
+                )
+                total_size += file_size
+                num_files += 1
 
             else:
-                response: Response = requests.get(
-                    "https://backup.googleapis.com/v1/{}?alt=media".format(file_url),
-                    headers={"Authorization": "Bearer {}".format(Auth["Auth"])},
-                    stream=True
+                print(
+                    f"    [-] Number: {file_index}/{total_files} - {local_file_path} : Download Failure, Error - {response.status_code} : {response.reason}"
                 )
-                if response.status_code == 200:
-
-                    os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
-                    destination: io.BufferedWriter
-                    with open(local_file_path, "bw") as destination:
-                        chunk: bytes
-                        for chunk in response.iter_content(chunk_size=None):
-                            destination.write(chunk)
-                    print("    [-] Number: {}/{} - {} : Download Success".format(file_index, total_files,
-                                                                                 local_file_path))
-                    total_size += file_size
-                    num_files += 1
-
-                else:
-                    print(
-                        "    [-] Number: {}/{} - {} : Download Failure, Error - {} : {}".format(file_index, total_files,
-                                                                                                local_file_path,
-                                                                                                response.status_code,
-                                                                                                response.reason))
-
-        file_index += 1
 
 
 class MyThread(threading.Thread):
@@ -469,48 +478,50 @@ def process_data(thread_name: str, q, is_dry_run: bool):
             queueLock.release()
             get_multiple_files_thread(data['bearer'], data['url'], data['local'], data['now'], data['lenfiles'],
                                       data['size'], thread_name, is_dry_run=is_dry_run)
-            time.sleep(1)
-
         else:
             queueLock.release()
-            time.sleep(1)
+
+        time.sleep(1)
 
 
 def get_multiple_files_thread(bearer: str, url: str, local: str, now: int, len_files: int, size: int, thread_name: str,
                               is_dry_run: bool):
     global total_size, num_files
-    if not os.path.isfile(local):
+    if os.path.isfile(local):
+        print(f"    [-] Number: {now}/{len_files} - {thread_name} => Skipped: {local}")
 
-        if is_dry_run:
-            print("    [-] Skipped (Dry Run): {}".format(local))
+    elif is_dry_run:
+        print(f"    [-] Skipped (Dry Run): {local}")
+
+    else:
+        response: Response = requests.get(
+            f"https://backup.googleapis.com/v1/{url}?alt=media",
+            headers={"Authorization": f"Bearer {bearer}"},
+            stream=True,
+        )
+        if response.status_code == 200:
+            os.makedirs(os.path.dirname(local), exist_ok=True)
+            destination: io.BufferedWriter
+            with open(local, "bw") as destination:
+                chunk: bytes
+                for chunk in response.iter_content(chunk_size=None):
+                    destination.write(chunk)
+            print(
+                f"    [-] Number: {now}/{len_files} - {thread_name} => Downloaded: {local}"
+            )
+            total_size += size
+            num_files += 1
 
         else:
-            response: Response = requests.get(
-                "https://backup.googleapis.com/v1/{}?alt=media".format(url),
-                headers={"Authorization": "Bearer {}".format(bearer)},
-                stream=True
+            print(
+                f"    [-] Number: {now}/{len_files} - {thread_name} => Not downloaded: {local}"
             )
-            if response.status_code == 200:
-                os.makedirs(os.path.dirname(local), exist_ok=True)
-                destination: io.BufferedWriter
-                with open(local, "bw") as destination:
-                    chunk: bytes
-                    for chunk in response.iter_content(chunk_size=None):
-                        destination.write(chunk)
-                print("    [-] Number: {}/{} - {} => Downloaded: {}".format(now, len_files, thread_name, local))
-                total_size += size
-                num_files += 1
-
-            else:
-                print("    [-] Number: {}/{} - {} => Not downloaded: {}".format(now, len_files, thread_name, local))
-    else:
-        print("    [-] Number: {}/{} - {} => Skipped: {}".format(now, len_files, thread_name, local))
 
 
 def operating_system():
     """ Get the name of the OS """
 
-    if sys.platform == "win32" or sys.platform == "cygwin":
+    if sys.platform in ["win32", "cygwin"]:
         return "Windows"
     elif sys.platform == "Darwin":
         if subprocess.check_output(['sysctl', '-n', 'machdep.cpu.brand_string']).decode('utf-8') == "Apple M1\n":

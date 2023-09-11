@@ -45,7 +45,7 @@ def help():
 def system_slash(string):
     """ Change / or \ depend on the OS"""
 
-    if sys.platform == "win32" or sys.platform == "win64" or sys.platform == "cygwin":
+    if sys.platform in ["win32", "win64", "cygwin"]:
         return string.replace("/", "\\")
 
     else:
@@ -55,7 +55,7 @@ def system_slash(string):
 def createSettingsFile():
     """ Function that creates the settings file """
 
-    cfg_file = system_slash(r'{}/cfg/settings.cfg'.format(whapa_path))
+    cfg_file = system_slash(f'{whapa_path}/cfg/settings.cfg')
     with open(cfg_file, 'w') as cfg:
         cfg.write(dedent("""
             [report]
@@ -89,32 +89,22 @@ def getMultipleFiles(api, files):
                   "Thread-21", "Thread-22", "Thread-23", "Thread-24", "Thread-25", "Thread-26", "Thread-27", "Thread-28", "Thread-29", "Thread-30",
                   "Thread-31", "Thread-32", "Thread-33", "Thread-34", "Thread-35", "Thread-36", "Thread-37", "Thread-38", "Thread-39", "Thread-40"]
     threads = []
-    threadID = 1
     print("[i] Generating threads...")
-    print("[+] Backup name : {}".format(api))
-    for tName in threadList:
+    print(f"[+] Backup name : {api}")
+    for threadID, tName in enumerate(threadList, start=1):
         thread = myThread(threadID, tName, workQueue)
         thread.start()
         threads.append(thread)
-        threadID += 1
-
-    n = 1
     lenfiles = len(files)
     queueLock.acquire()
-    if args.output:
-        output = args.output
-    else:
-        output = ""
-
-    for entries in files:
+    output = args.output if args.output else ""
+    for n, entries in enumerate(files, start=1):
         file = entries.filename
         local = (output + file).replace("/", os.path.sep)
         if os.path.isfile(local):
-            print("    [-] Number: {}/{}  => {} Skipped".format(n, lenfiles, local))
+            print(f"    [-] Number: {n}/{lenfiles}  => {local} Skipped")
         else:
-             workQueue.put({'photo': entries, 'local': local, 'now': n, 'lenfiles': lenfiles})
-        n += 1
-
+            workQueue.put({'photo': entries, 'local': local, 'now': n, 'lenfiles': lenfiles})
     queueLock.release()
     while not workQueue.empty():
         pass
@@ -144,11 +134,10 @@ def process_data(threadName, q):
             data = q.get()
             queueLock.release()
             getMultipleFilesThread(data['photo'], data['local'], data['now'], data['lenfiles'], threadName)
-            time.sleep(1)
-
         else:
             queueLock.release()
-            time.sleep(1)
+
+        time.sleep(1)
 
 
 def getMultipleFilesThread(photo, local, now, lenfiles, threadName):
@@ -158,10 +147,12 @@ def getMultipleFilesThread(photo, local, now, lenfiles, threadName):
         with open(local, 'wb') as opened_file:
             opened_file.write(download.raw.read())
 
-        print("    [-] Number: {}/{} - {} => Downloaded: {}".format(now, lenfiles, threadName, local))
+        print(
+            f"    [-] Number: {now}/{lenfiles} - {threadName} => Downloaded: {local}"
+        )
 
     else:
-        print("    [-] Number: {}/{} - {} => Skipped: {}".format(now, lenfiles, threadName, local))
+        print(f"    [-] Number: {now}/{lenfiles} - {threadName} => Skipped: {local}")
 
 
 def login():
@@ -173,7 +164,7 @@ def login():
         print("Two-factor authentication required.")
         code = input("Enter the code you received of one of your approved devices: ")
         result = api.validate_2fa_code(code)
-        print("Code validation result: %s" % result)
+        print(f"Code validation result: {result}")
 
         if not result:
             print("Failed to verify security code")
@@ -182,7 +173,7 @@ def login():
         if not api.is_trusted_session:
             print("Session is not trusted. Requesting trust...")
             result = api.trust_session()
-            print("Session trust result %s" % result)
+            print(f"Session trust result {result}")
 
             if not result:
                 print("Failed to request trust. You will likely be prompted for the code again in the coming weeks")
@@ -193,8 +184,15 @@ def login():
         devices = api.trusted_devices
         for i, device in enumerate(devices):
             print(
-                "  %s: %s" % (i, device.get('deviceName',
-                                            "SMS to %s" % device.get('phoneNumber')))
+                (
+                    "  %s: %s"
+                    % (
+                        i,
+                        device.get(
+                            'deviceName', f"SMS to {device.get('phoneNumber')}"
+                        ),
+                    )
+                )
             )
 
         device = click.prompt('Which device would you like to use?', default=0)
@@ -208,7 +206,7 @@ def login():
             print("Failed to verify verification code")
             sys.exit(1)
 
-    print("Devices available:\n {}".format(api.devices))
+    print(f"Devices available:\n {api.devices}")
     device = click.prompt('Which device would you like to select?', default=0)
     api.devices[device]
 
@@ -218,15 +216,15 @@ def login():
 def getConfigs():
     global icloud, passw
     config = ConfigParser(interpolation=None)
-    cfg_file = system_slash(r'{}/cfg/settings.cfg'.format(whapa_path))
+    cfg_file = system_slash(f'{whapa_path}/cfg/settings.cfg')
 
     try:
         config.read(cfg_file)
         icloud = config.get('icloud-auth', 'icloud')
         passw = config.get('icloud-auth', 'passw')
 
-    except(ConfigParser.NoSectionError, ConfigParser.NoOptionError):
-        quit('The "{}" file is missing or corrupt!'.format(cfg_file))
+    except (ConfigParser.NoSectionError, ConfigParser.NoOptionError):
+        quit(f'The "{cfg_file}" file is missing or corrupt!')
 
 
 # Initializing
@@ -243,7 +241,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     files = []
-    cfg_file = system_slash(r'{}/cfg/settings.cfg'.format(whapa_path))
+    cfg_file = system_slash(f'{whapa_path}/cfg/settings.cfg')
     if not os.path.isfile(cfg_file):
         create_settings_file()
 
@@ -255,9 +253,7 @@ if __name__ == "__main__":
         api = login()
         print("[i] Searching...")
         if args.sync:
-            for entries in api.photos.albums['WhatsApp']:
-                files.append(entries)
-
+            files.extend(iter(api.photos.albums['WhatsApp']))
             getMultipleFiles(api, files)
 
         elif args.list:
@@ -272,7 +268,7 @@ if __name__ == "__main__":
         elif args.s_images:
             for entries in api.photos.albums['WhatsApp']:
                 file_name, extension = splitext(entries.filename)
-                if (extension == ".jpg") or (extension == ".png"):
+                if extension in [".jpg", ".png"]:
                     files.append(entries)
 
             getMultipleFiles(api, files)
@@ -280,7 +276,7 @@ if __name__ == "__main__":
         elif args.s_videos:
             for entries in api.photos.albums['WhatsApp']:
                 file_name, extension = splitext(entries.filename)
-                if (extension == ".mp4") or (extension == ".3gp") or (extension == ".mp3"):
+                if extension in [".mp4", ".3gp", ".mp3"]:
                     files.append(entries)
 
             getMultipleFiles(api, files)
@@ -296,7 +292,7 @@ if __name__ == "__main__":
                             download = photo.download()
                             with open(local, 'wb') as opened_file:
                                 opened_file.write(download.raw.read())
-                                print("    [-] Downloaded: {}".format(local))
+                                print(f"    [-] Downloaded: {local}")
 
                 else:
-                    print("    [-] Skipped: {}".format(local))
+                    print(f"    [-] Skipped: {local}")

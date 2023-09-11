@@ -22,7 +22,7 @@ def int_to_bytes(num: int, pad_multiple: int = 1) -> bytes:
     value = hex(num)[2:]
     value = value.rstrip("L")
     if len(value) & 1:
-        value = "0" + value
+        value = f"0{value}"
     result = binascii.unhexlify(value)
     if pad_multiple not in [0, 1]:
         filled_so_far = len(result) % pad_multiple

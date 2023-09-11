@@ -231,7 +231,7 @@ background-color: #cdcdcd;
 def system_slash(string):
     """ Change / or \ depend on the OS"""
 
-    if sys.platform == "win32" or sys.platform == "win64" or sys.platform == "cygwin":
+    if sys.platform in ["win32", "win64", "cygwin"]:
         return string.replace("/", "\\")
 
     else:
@@ -243,7 +243,7 @@ def get_configs():
     global company, record, unit, examiner, notes
     config_report = ConfigParser()
     try:
-        cfg_file = system_slash(r'{}/cfg/settings.cfg'.format(whapa_path))
+        cfg_file = system_slash(f'{whapa_path}/cfg/settings.cfg')
         config_report.read(cfg_file)
         company = config_report.get('report', 'company')
         record = config_report.get('report', 'record')
@@ -256,19 +256,13 @@ def get_configs():
 
 def startsWithDateTimeiOS(s):
     pattern = "^\[([0-9]*[/.][0-9]*[/.][0-9]*\W*[0-9]*.[0-9]*.[0-9]*)\]"  # [25/8/20, 19:52:23]
-    result = re.match(pattern, s)
-    if result:
-        return True
-    return False
+    return bool(result := re.match(pattern, s))
 
 
 def startsWithDateTimeAndroid(s):
     # pattern = "^([0-9]*/[0-9]*/[0-9]*\W*[0-9]*.[0-9]*.[0-9]*)-"  # 24/5/18 14:25 -
     pattern = "^([0-9]*[/.][0-9]*[/.][0-9]*\W*[0-9]*.[0-9]*.[0-9]*) -" # 24.07.21, 10:15 -
-    result = re.match(pattern, s)
-    if result:
-        return True
-    return False
+    return bool(result := re.match(pattern, s))
 
 
 def startsWithAuthor(s):
@@ -281,10 +275,7 @@ def startsWithAuthor(s):
         '(\W.*):'  # PhoneNumber
     ]
     pattern = '^' + '|'.join(patterns)
-    result = re.match(pattern, s)
-    if result:
-        return True
-    return False
+    return bool(result := re.match(pattern, s))
 
 
 def getDataPointiOS(line):
@@ -340,30 +331,34 @@ def getDataFrame(conversationPath, operating_system):
                     parsedData.append([date, time, author, ' '.join(messageBuffer)])
                     break
                 line = line.strip()  # Guarding against erroneous leading and trailing whitespaces
-                if operating_system == "ios":
-                    if startsWithDateTimeiOS(line):  # If a line starts with a Date Time pattern, then this indicates the beginning of a new message
-                        if len(messageBuffer) > 0:  # Check if the message buffer contains characters from previous iterations
-                            parsedData.append([date, time, author, ' '.join(messageBuffer)])  # Save the tokens from the previous message in parsedData
+                if operating_system == "ios" and startsWithDateTimeiOS(line):  # If a line starts with a Date Time pattern, then this indicates the beginning of a new message
+                    if messageBuffer:  # Check if the message buffer contains characters from previous iterations
+                        parsedData.append([date, time, author, ' '.join(messageBuffer)])  # Save the tokens from the previous message in parsedData
 
-                        messageBuffer.clear()  # Clear the message buffer so that it can be used for the next message
-                        date, time, author, message = getDataPointiOS(line)  # Identify and extract tokens from the line
-                        messageBuffer.append(message)  # Append message to buffer
-                    else:
-                        messageBuffer.append(line)  # If a line doesn't start with a Date Time pattern, then it is part of a multi-line message. So, just append to buffer
+                    messageBuffer.clear()  # Clear the message buffer so that it can be used for the next message
+                    date, time, author, message = getDataPointiOS(line)  # Identify and extract tokens from the line
+                    messageBuffer.append(message)  # Append message to buffer
+                elif (
+                    operating_system == "ios"
+                    and not startsWithDateTimeiOS(line)
+                    or operating_system != "ios"
+                    and operating_system == "android"
+                    and not startsWithDateTimeAndroid(line)
+                ):
+                    messageBuffer.append(line)  # If a line doesn't start with a Date Time pattern, then it is part of a multi-line message. So, just append to buffer
 
-                elif operating_system == "android":
-                    if startsWithDateTimeAndroid(line):  # If a line starts with a Date Time pattern, then this indicates the beginning of a new message
-                        if len(messageBuffer) > 0:  # Check if the message buffer contains characters from previous iterations
-                            parsedData.append([date, time, author, ' '.join(messageBuffer)])  # Save the tokens from the previous message in parsedData
+                elif (
+                    operating_system != "ios"
+                    and operating_system == "android"
+                    and startsWithDateTimeAndroid(line)
+                ):  # If a line starts with a Date Time pattern, then this indicates the beginning of a new message
+                    if messageBuffer:  # Check if the message buffer contains characters from previous iterations
+                        parsedData.append([date, time, author, ' '.join(messageBuffer)])  # Save the tokens from the previous message in parsedData
 
-                        messageBuffer.clear()  # Clear the message buffer so that it can be used for the next message
-                        date, time, author, message = getDataPointAndroid(line)  # Identify and extract tokens from the line
-                        messageBuffer.append(message)  # Append message to buffer
-                    else:
-                        messageBuffer.append(line)  # If a line doesn't start with a Date Time pattern, then it is part of a multi-line message. So, just append to buffer
-
-        df = pd.DataFrame(parsedData, columns=['Date', 'Time', 'Author', 'Message'])
-        return df
+                    messageBuffer.clear()  # Clear the message buffer so that it can be used for the next message
+                    date, time, author, message = getDataPointAndroid(line)  # Identify and extract tokens from the line
+                    messageBuffer.append(message)  # Append message to buffer
+        return pd.DataFrame(parsedData, columns=['Date', 'Time', 'Author', 'Message'])
     except Exception as e:
         print("[e] Error getting participants. Choose another operating system.")
         exit()
@@ -371,22 +366,21 @@ def getDataFrame(conversationPath, operating_system):
 
 def getAttachediOS(message):
     pattern = ".*<attached: (.*)>|.*<adjunto: (.*)>"    #.*<adjunto: (.*)>
-    result = re.match(pattern, message)
-    if result:
+    if result := re.match(pattern, message):
         file = result.group(1)
         if not file:
             file = result.group(2)
 
         if re.match(".*-PHOTO-.*", file):
-            if (report_var == 'EN') or (report_var == 'ES'):
+            if report_var in ['EN', 'ES']:
                 message = file + "</br><a href=\"" + file + "\" target=\"_blank\"> <IMG SRC='" + file + " 'width=\"100\" height=\"100\"/></a>"
 
         elif re.match(".*-AUDIO-.*", file):
-            if (report_var == 'EN') or (report_var == 'ES'):
+            if report_var in ['EN', 'ES']:
                 message = file + '</br><audio controls> <source src="' + file + ' "</audio>'
 
         elif re.match(".*-VIDEO-.*", file):
-            if (report_var == 'EN') or (report_var == 'ES'):
+            if report_var in ['EN', 'ES']:
                 message = file + '</br><video width="300" height="150" controls> <source src="' + file + ' "</video>'
 
         elif re.match(".*-STICKER-.*", file):
@@ -409,20 +403,27 @@ def getAttachediOS(message):
         return message
 
     pattern = ".*Location:.*q=(.*)|.*Ubicación:.*q=(.*)"
-    result = re.match(pattern, message)
-    if result:
+    if result := re.match(pattern, message):
         file = result.group(1)
         if not file:
             file = result.group(2)
 
         location = file.split(",")
-        lon = str(location[0])
-        lat = str(location[1])
-        if (report_var == 'EN') or (report_var == 'ES'):
+        if report_var in ['EN', 'ES']:
+            lon = str(location[0])
+            lat = str(location[1])
             try:
-                message = "<br> " + message.split('Location:')[1] + "</br><iframe width='300' height='150' id='gmap_canvas' src='https://maps.google.com/maps?q={}%2C{}&t=&z=15&ie=UTF8&iwloc=&output=embed' frameborder='0' scrolling='no' marginheight='0' marginwidth='0'></iframe>".format(lon, lat)
+                message = (
+                    "<br> "
+                    + message.split('Location:')[1]
+                    + f"</br><iframe width='300' height='150' id='gmap_canvas' src='https://maps.google.com/maps?q={lon}%2C{lat}&t=&z=15&ie=UTF8&iwloc=&output=embed' frameborder='0' scrolling='no' marginheight='0' marginwidth='0'></iframe>"
+                )
             except:
-                message = "<br> " + message.split('Ubicación:')[1] + "</br><iframe width='300' height='150' id='gmap_canvas' src='https://maps.google.com/maps?q={}%2C{}&t=&z=15&ie=UTF8&iwloc=&output=embed' frameborder='0' scrolling='no' marginheight='0' marginwidth='0'></iframe>".format(lon, lat)
+                message = (
+                    "<br> "
+                    + message.split('Ubicación:')[1]
+                    + f"</br><iframe width='300' height='150' id='gmap_canvas' src='https://maps.google.com/maps?q={lon}%2C{lat}&t=&z=15&ie=UTF8&iwloc=&output=embed' frameborder='0' scrolling='no' marginheight='0' marginwidth='0'></iframe>"
+                )
 
         return message
 
@@ -431,22 +432,21 @@ def getAttachediOS(message):
 
 def getAttachedAndroid(message):
     pattern = "(.*) \(attached file\)|(.*) \(archivo adjunto\)"
-    result = re.match(pattern, message)
-    if result:
+    if result := re.match(pattern, message):
         file = result.group(1)
         if not file:
             file = result.group(2)
 
         if re.match("IMG-.*", file):
-            if (report_var == 'EN') or (report_var == 'ES'):
+            if report_var in ['EN', 'ES']:
                 message = file + "</br><a href=\"" + file + "\" target=\"_blank\"> <IMG SRC='" + file + " 'width=\"100\" height=\"100\"/></a>"
 
         elif re.match("PTT-.*", file):
-            if (report_var == 'EN') or (report_var == 'ES'):
+            if report_var in ['EN', 'ES']:
                 message = file + '</br><audio controls> <source src="' + file + ' "</audio>'
 
         elif re.match("VID-.*", file):
-            if (report_var == 'EN') or (report_var == 'ES'):
+            if report_var in ['EN', 'ES']:
                 message = file + '</br><video width="300" height="150" controls> <source src="' + file + ' "</video>'
 
         elif re.match("STK-.*", file):
@@ -469,20 +469,26 @@ def getAttachedAndroid(message):
         return message
 
     pattern = ".*location.*q=(.*)|.*ubicación.*q=(.*)"
-    result = re.match(pattern, message)
-
-    if result:
+    if result := re.match(pattern, message):
         file = result.group(1)
         if not file:
             file = result.group(2)
         location = file.split(",")
-        lon = str(location[0])
-        lat = str(location[1])
-        if (report_var == 'EN') or (report_var == 'ES'):
+        if report_var in ['EN', 'ES']:
+            lon = str(location[0])
+            lat = str(location[1])
             try:
-                message = "<br> " + message.split('location')[1] + "</br><iframe width='300' height='150' id='gmap_canvas' src='https://maps.google.com/maps?q={}%2C{}&t=&z=15&ie=UTF8&iwloc=&output=embed' frameborder='0' scrolling='no' marginheight='0' marginwidth='0'></iframe>".format(lon, lat)
+                message = (
+                    "<br> "
+                    + message.split('location')[1]
+                    + f"</br><iframe width='300' height='150' id='gmap_canvas' src='https://maps.google.com/maps?q={lon}%2C{lat}&t=&z=15&ie=UTF8&iwloc=&output=embed' frameborder='0' scrolling='no' marginheight='0' marginwidth='0'></iframe>"
+                )
             except:
-                message = "<br> " + message.split('ubicación')[1] + "</br><iframe width='300' height='150' id='gmap_canvas' src='https://maps.google.com/maps?q={}%2C{}&t=&z=15&ie=UTF8&iwloc=&output=embed' frameborder='0' scrolling='no' marginheight='0' marginwidth='0'></iframe>".format(lon, lat)
+                message = (
+                    "<br> "
+                    + message.split('ubicación')[1]
+                    + f"</br><iframe width='300' height='150' id='gmap_canvas' src='https://maps.google.com/maps?q={lon}%2C{lat}&t=&z=15&ie=UTF8&iwloc=&output=embed' frameborder='0' scrolling='no' marginheight='0' marginwidth='0'></iframe>"
+                )
 
         return message
 
@@ -499,7 +505,7 @@ def messages(data, user, recipient, report_html, local, time_start, time_end, ti
             report_msj = ""  # Saves each message
             report_name = ""  # Saves the chat sender
             message = ""  # Saves each msg
-            sys.stdout.write("\rMessage {}/{}".format(str(i+1), str(rows)))
+            sys.stdout.write(f"\rMessage {str(i + 1)}/{rows}")
             sys.stdout.flush()
             # transform chat time in epoch local time
             time_parse = str(data['Date'][i]) + " " + str(data['Time'][i])
@@ -517,7 +523,7 @@ def messages(data, user, recipient, report_html, local, time_start, time_end, ti
                     sender = "None"
                 if sender == user:
                     # The owner post a message
-                    if (report_var == 'EN') or (report_var == 'ES'):
+                    if report_var in ['EN', 'ES']:
                         report_name = user
                     else:
                         message = Fore.RED + "\n--------------------------------------------------------------------------------" + Fore.RESET + "\n"
@@ -533,21 +539,19 @@ def messages(data, user, recipient, report_html, local, time_start, time_end, ti
                         message = Fore.RED + "\n--------------------------------------------------------------------------------" + Fore.RESET + "\n"
                         message += Fore.GREEN + "From " + Fore.RESET + "System\n"
 
+                elif report_var in ['EN', 'ES']:
+                    report_name = f"<font color='{color.get(sender)}'> {sender} </font>"
                 else:
-                    # Other user post a message
-                    if (report_var == 'EN') or (report_var == 'ES'):
-                        report_name = "<font color='{}'> {} </font>".format(color.get(sender), sender)
-                    else:
-                        message = Fore.RED + "\n--------------------------------------------------------------------------------" + Fore.RESET + "\n"
-                        message += Fore.GREEN + "From " + Fore.RESET + sender + Fore.GREEN + " to" + Fore.RESET + " Me\n"
+                    message = Fore.RED + "\n--------------------------------------------------------------------------------" + Fore.RESET + "\n"
+                    message += Fore.GREEN + "From " + Fore.RESET + sender + Fore.GREEN + " to" + Fore.RESET + " Me\n"
 
-                if (report_var == 'EN') or (report_var == 'ES'):
+                if report_var in ['EN', 'ES']:
                     report_msj += text
                 else:
                     message += Fore.GREEN + "Message: " + Fore.RESET + html.unescape(text) + "\n"
 
-                report_time = "{} - {}".format(str(data['Date'][i]), str(data['Time'][i]))
-                if (report_var == 'EN') or (report_var == 'ES'):
+                report_time = f"{str(data['Date'][i])} - {str(data['Time'][i])}"
+                if report_var in ['EN', 'ES']:
                     if report_name == user:
                         rep_med += """
                 <li>
@@ -557,7 +561,7 @@ def messages(data, user, recipient, report_html, local, time_start, time_end, ti
                         <span class="time round2">""" + report_time + "&nbsp" + """</span><br>
                     </div>
                 </li>"""
-                    elif (report_name == "System Message") or (report_name == "Mensaje de Sistema"):
+                    elif report_name in ["System Message", "Mensaje de Sistema"]:
                         rep_med += """
                 <li>
                     <div class="bubble-system"> 
@@ -579,7 +583,9 @@ def messages(data, user, recipient, report_html, local, time_start, time_end, ti
                     print(message)
 
         except Exception as e:
-            print("\nError showing message details: {}, Message ID {}, Timestamp {}".format(e, str(i), data['Date'][i] + ", " + data['Time'][i]))
+            print(
+                f"""\nError showing message details: {e}, Message ID {str(i)}, Timestamp {data['Date'][i] + ", " + data['Time'][i]}"""
+            )
 
         if report_var != "None":
             report(rep_med, report_html, local)
@@ -621,11 +627,11 @@ if __name__ == "__main__":
         mobileOS = args.system
         epoch_start = 0.0
         epoch_end = time.time()
-        if mobileOS == "ios":
-            timeformat = "%d/%m/%y %H:%M:%S"
-
-        elif mobileOS == "android":
+        if mobileOS == "android":
             timeformat = "%d/%m/%y %H:%M"
+
+        elif mobileOS == "ios":
+            timeformat = "%d/%m/%y %H:%M:%S"
 
         if args.format:
             timeformat = args.format
@@ -673,11 +679,7 @@ if __name__ == "__main__":
 
             # Get the full list of participants
             participants = dataframe["Author"].unique().tolist()
-            final = []
-            for i in participants:
-                if i is not None:
-                    final.append(i)
-
+            final = [i for i in participants if i is not None]
             color = participants_color(final)
             if report_var == 'EN':
                 report_html = "report_" + report_name + ".html"
@@ -685,7 +687,7 @@ if __name__ == "__main__":
             elif report_var == 'ES':
                 report_html = "informe_" + report_name + ".html"
 
-            print("\nNumber of messages: {}".format(len(dataframe.index)))
+            print(f"\nNumber of messages: {len(dataframe.index)}")
             print(Fore.RED + "--------------------------------------------------------------------------------" + Fore.RESET)
             print(Fore.CYAN + "CHAT " + arg_user + Fore.RESET)
             messages(dataframe, user, recipient, report_html, local, epoch_start, epoch_end, timeformat, mobileOS)

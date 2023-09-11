@@ -21,9 +21,7 @@ def key_from_b64(b64_key: bytes) -> RsaKey:
     j = bytes_to_int(binary_key[i + 4 : i + 4 + 4])
     exponent = bytes_to_int(binary_key[i + 8 : i + 8 + j])
 
-    key = RSA.construct((mod, exponent))
-
-    return key
+    return RSA.construct((mod, exponent))
 
 
 def key_to_struct(key: RsaKey) -> bytes:

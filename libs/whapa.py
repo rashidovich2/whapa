@@ -72,16 +72,22 @@ def db_connect(db):
 
 def status(st):
     """ Function message status"""
-    if st == 0 or st == 5:  # 0 for me and 5 for target
+    if st in [0, 5]:  # 0 for me and 5 for target
         return "Received", "&#10004;&#10004;"
     elif st == 4:
-        return Fore.RED + "Waiting in server" + Fore.RESET, "&#10004;"
+        return f"{Fore.RED}Waiting in server{Fore.RESET}", "&#10004;"
     elif st == 6:
-        return Fore.YELLOW + "System message" + Fore.RESET, "&#128187;"
-    elif st == 8 or st == 10:
-        return Fore.BLUE + "Audio played" + Fore.RESET, "<font color=\"#0000ff \">&#10004;&#10004;</font>"   # 10 for me and 8 for target
-    elif st == 13 or st == 12:
-        return Fore.BLUE + "Seen" + Fore.RESET, "<font color=\"#0000ff \">&#10004;&#10004;</font>"
+        return f"{Fore.YELLOW}System message{Fore.RESET}", "&#128187;"
+    elif st in [8, 10]:
+        return (
+            f"{Fore.BLUE}Audio played{Fore.RESET}",
+            "<font color=\"#0000ff \">&#10004;&#10004;</font>",
+        )
+    elif st in [13, 12]:
+        return (
+            f"{Fore.BLUE}Seen{Fore.RESET}",
+            "<font color=\"#0000ff \">&#10004;&#10004;</font>",
+        )
     else:
         return str(st), ""
 
@@ -101,11 +107,11 @@ def duration_file(obj):
     minu = int((obj - (hour * 3600)) / 60)
     seco = obj - ((hour * 3600) + (minu * 60))
     if obj >= 3600:
-        obj = (str(hour) + "h " + str(minu) + "m " + str(seco) + "s")
+        obj = f"{hour}h {minu}m {str(seco)}s"
     elif 60 < obj < 3600:
-        obj = (str(minu) + "m " + str(seco) + "s")
+        obj = f"{minu}m {str(seco)}s"
     else:
-        obj = (str(seco) + "s")
+        obj = f"{str(seco)}s"
     return obj
 
 
@@ -134,34 +140,29 @@ def names(obj):
 
 def gets_name(obj):
     """ Function recover a name of the wa.db"""
-    if names_dict == {}:  # No exists wa.db
+    if names_dict == {}:
         return " "
-    else:  # Exists Wa.db
-        if type(obj) is list:  # It's a list
-            list_broadcast = []
-            for i in obj:
-                b = i + "@s.whatsapp.net"
-                if b in names_dict:
-                    if names_dict[b] is not None:
-                        list_broadcast.append(names_dict[b])
-                    else:
-                        list_broadcast.append(i)
-                else:
-                    list_broadcast.append(i)
-            return " (" + ", ".join(list_broadcast) + ")"
-        else:  # It's a string
-            if obj in names_dict:
-                if names_dict[obj] is not None:
-                    return " (" + names_dict[obj] + ")"
-                else:
-                    return ""
-            else:
-                return ""
+    if type(obj) is not list:
+        return (
+            f" ({names_dict[obj]})"
+            if obj in names_dict and names_dict[obj] is not None
+            else ""
+        )
+    list_broadcast = []
+    for i in obj:
+        b = f"{i}@s.whatsapp.net"
+        if b in names_dict and names_dict[b] is not None:
+            list_broadcast.append(names_dict[b])
+        else:
+            list_broadcast.append(i)
+    return " (" + ", ".join(list_broadcast) + ")"
 
 
 def participants(obj):
     """ Function saves all participant in an group or broadcast"""
-    sql_string_group = "SELECT jid, admin FROM group_participants WHERE gjid='" + str(obj) + "'"
+    sql_string_group = (
+        f"SELECT jid, admin FROM group_participants WHERE gjid='{str(obj)}'"
+    )
     sql_consult_group = cursor.execute(sql_string_group)
     report_group = ""
     for i in sql_consult_group:
@@ -172,21 +173,26 @@ def participants(obj):
             current_color = color.get(i[0].split("@")[0])
 
             if i[1] and i[1] == 0:  # User
-                if report_var == 'EN' or report_var == 'ES':
-                    report_group += "<font color=\"{}\"> {} </font>, ".format(current_color, i[0].split("@")[0] + gets_name(i[0]))
-                else:
-                    report_group += i[0].split("@")[0] + " " + Fore.YELLOW + gets_name(i[0]) + Fore.RESET + ", "
+                report_group += (
+                    f'<font color=\"{current_color}\"> {i[0].split("@")[0] + gets_name(i[0])} </font>, '
+                    if report_var in ['EN', 'ES']
+                    else i[0].split("@")[0]
+                    + " "
+                    + Fore.YELLOW
+                    + gets_name(i[0])
+                    + Fore.RESET
+                    + ", "
+                )
             elif i[1] and i[1] > 0:  # Admin
-                if report_var == 'EN' or report_var == 'ES':
-                    report_group += "<font color=\"{}\"> {} </font> ***Admin***, ".format(current_color, i[0].split("@")[0] + gets_name(i[0]))
+                if report_var in ['EN', 'ES']:
+                    report_group += f'<font color=\"{current_color}\"> {i[0].split("@")[0] + gets_name(i[0])} </font> ***Admin***, '
 
                 else:
                     report_group += i[0].split("@")[0] + Fore.YELLOW + gets_name(i[0]) + Fore.RESET + Fore.RED + "(Admin)" + Fore.RESET + ", "
+            elif report_var in ['EN', 'ES']:
+                report_group += f'<font color=\"{current_color}\"> {i[0].split("@")[0] + gets_name(i[0])} </font>, '
             else:
-                if report_var == 'EN' or report_var == 'ES':
-                    report_group += "<font color=\"{}\"> {} </font>, ".format(current_color, i[0].split("@")[0] + gets_name(i[0]))
-                else:
-                    report_group += i[0].split("@")[0] + " " + Fore.YELLOW + gets_name(i[0]) + Fore.RESET + ", "
+                report_group += i[0].split("@")[0] + " " + Fore.YELLOW + gets_name(i[0]) + Fore.RESET + ", "
         else:  # Me
             current_color = "#000000"
             if i[1] and i[1] == 0:  # User
@@ -198,20 +204,20 @@ def participants(obj):
                     report_group += "Me, "
             elif i[1] and i[1] > 0:  # Admin
                 if report_var == 'EN':
-                    report_group += "<font color='{}'> Phone user </font> *** Admin ***, ".format(current_color)
+                    report_group += f"<font color='{current_color}'> Phone user </font> *** Admin ***, "
                 elif report_var == 'ES':
-                    report_group += "<font color='{}'> Usuario del teléfono </font> *** Admin ***, ".format(current_color)
+                    report_group += f"<font color='{current_color}'> Usuario del teléfono </font> *** Admin ***, "
                 else:
-                    report_group += "Me" + Fore.RED + " (Admin)" + Fore.RESET + ", "
+                    report_group += f"Me{Fore.RED} (Admin)" + Fore.RESET + ", "
             else:  # Broadcast no user, no admin
                 if report_var == 'EN':
-                    report_group += "<font color='{}'> Phone user </font>, ".format(current_color)
+                    report_group += f"<font color='{current_color}'> Phone user </font>, "
                 elif report_var == 'ES':
-                    report_group += "<font color='{}'> Usuario del teléfono </font>, ".format(current_color)
+                    report_group += f"<font color='{current_color}'> Usuario del teléfono </font>, "
                 else:
                     report_group += "Me, "
 
-    if (report_var == 'EN') or (report_var == 'ES'):
+    if report_var in ['EN', 'ES']:
         report_group = "<p style = 'border: 2px solid #CCCCCC; padding: 10px; background-color: #CCCCCC; color: black; font-family: arial,helvetica; font-size: 14px; font-weight: bold;'> " + report_group[:-2] + " </p>"
 
     return report_group, color
@@ -221,10 +227,16 @@ def report(obj, html, local):
     """ Function that makes the report """
 
     # Copia los estilos
-    os.makedirs(local + "cfg", exist_ok=True)
+    os.makedirs(f"{local}cfg", exist_ok=True)
     if report_var == 'EN':
-        rep_ini = """<!DOCTYPE html>
-<html lang='""" + report_var + """'>
+        rep_ini = (
+            (
+                (
+                    (
+                        """<!DOCTYPE html>
+<html lang='"""
+                        + report_var
+                        + """'>
 
 <head>
     <meta charset="utf-8">
@@ -233,7 +245,9 @@ def report(obj, html, local):
     <meta name="description" content="Report makes with Whatsapp Parser Tool">
     <meta name="author" content="B16f00t">
     <link rel="shortcut icon" href="./cfg/logo.png">
-    <title>Whatsapp Parser Tool v""" + version + """ Report</title>
+    <title>Whatsapp Parser Tool v"""
+                        + version
+                        + """ Report</title>
     <!-- Bootstrap core CSS -->
     <link href="dist/css/bootstrap.css" rel="stylesheet">
     <!-- Bootstrap theme -->
@@ -267,7 +281,9 @@ background-color: #cdcdcd;
     <div class="container theme-showcase">
         <div class="header">
             <table style="width:100%">
-                <h1 align="left"><img src="./cfg/logo.png" height=128 width=128 align="center">&nbsp;""" + company + """</h1>
+                <h1 align="left"><img src="./cfg/logo.png" height=128 width=128 align="center">&nbsp;"""
+                        + company
+                        + """</h1>
                 <tr>
                     <th>Record</th>
                     <th>Unit / Company</th> 
@@ -275,27 +291,54 @@ background-color: #cdcdcd;
                     <th>Date</th>
                 </tr>
                 <tr>
-                    <td>""" + record + """</td>
-                    <td>""" + unit + """</td>
-                    <td>""" + examiner + """</td>
-                    <td>""" + time.strftime('%d-%m-%Y', time.localtime()) + """</td>
+                    <td>"""
+                        + record
+                        + """</td>
+                    <td>"""
+                        + unit
+                        + """</td>
+                    <td>"""
+                        + examiner
+                        + """</td>
+                    <td>"""
+                        + time.strftime('%d-%m-%Y', time.localtime())
+                        + """</td>
                 </tr>
                 <tr>
                     <th colspan="4">Notes</th>
                 </tr>
                 <tr>
-                    <td colspan="4">""" + notes + """</td>
+                    <td colspan="4">"""
+                        + notes
+                        + """</td>
                 </tr>
             </table>
             <h2 align=center> Chat </h2>
-            <h3 align=center> """ + arg_group + gets_name(arg_group) + arg_user + gets_name(arg_user + "@s.whatsapp.net") + """ </h3>
-            """ + report_group + """
+            <h3 align=center> """
+                        + arg_group
+                        + gets_name(arg_group)
+                        + arg_user
+                        + gets_name(f"{arg_user}@s.whatsapp.net")
+                    )
+                    + """ </h3>
+            """
+                )
+                + report_group
+            )
+            + """
         </div>
         <ul>"""
+        )
 
     elif report_var == 'ES':
-        rep_ini = """<!DOCTYPE html>
-<html lang='""" + report_var + """'>
+        rep_ini = (
+            (
+                (
+                    (
+                        """<!DOCTYPE html>
+<html lang='"""
+                        + report_var
+                        + """'>
 
 <head>
     <meta charset="utf-8">
@@ -304,7 +347,9 @@ background-color: #cdcdcd;
     <meta name="description" content="Informe creado por WhatsApp Parser Tool">
     <meta name="author" content="B16f00t">
     <link rel="shortcut icon" href="./cfg/logo.png">
-    <title>Whatsapp Parser Tool v""" + version + """ Report</title>
+    <title>Whatsapp Parser Tool v"""
+                        + version
+                        + """ Report</title>
     <!-- Bootstrap core CSS -->
     <link href="dist/css/bootstrap.css" rel="stylesheet">
     <!-- Bootstrap theme -->
@@ -338,7 +383,9 @@ background-color: #cdcdcd;
     <div class="container theme-showcase">
         <div class="header">
             <table style="width:100%">
-                <h1 align="left"><img src="./cfg/logo.png" height=128 width=128 align="center">&nbsp;""" + company + """</h1>
+                <h1 align="left"><img src="./cfg/logo.png" height=128 width=128 align="center">&nbsp;"""
+                        + company
+                        + """</h1>
                 <tr>
                     <th>Registro</th>
                     <th>Unidad / Compañia</th> 
@@ -346,23 +393,44 @@ background-color: #cdcdcd;
                     <th>Fecha</th>
                 </tr>
                 <tr>
-                    <td>""" + record + """</td>
-                    <td>""" + unit + """</td>
-                    <td>""" + examiner + """</td>
-                    <td>""" + time.strftime('%d-%m-%Y', time.localtime()) + """</td>
+                    <td>"""
+                        + record
+                        + """</td>
+                    <td>"""
+                        + unit
+                        + """</td>
+                    <td>"""
+                        + examiner
+                        + """</td>
+                    <td>"""
+                        + time.strftime('%d-%m-%Y', time.localtime())
+                        + """</td>
                 </tr>
                 <tr>
                     <th colspan="4">Observaciones</th>
                 </tr>
                 <tr>
-                    <td colspan="4">""" + notes + """</td>
+                    <td colspan="4">"""
+                        + notes
+                        + """</td>
                 </tr>
             </table>
             <h2 align=center> Conversación </h2>
-            <h3 align=center> """ + arg_group + gets_name(arg_group) + arg_user + gets_name(arg_user + "@s.whatsapp.net") + """ </h3>
-            """ + report_group + """
+            <h3 align=center> """
+                        + arg_group
+                        + gets_name(arg_group)
+                        + arg_user
+                        + gets_name(f"{arg_user}@s.whatsapp.net")
+                    )
+                    + """ </h3>
+            """
+                )
+                + report_group
+            )
+            + """
         </div>
         <ul>"""
+        )
 
     rep_end = """
             <li>
@@ -389,68 +457,7 @@ background-color: #cdcdcd;
 
 def index_report(obj, html):
     """ Function that makes the index report """
-    if report_var == "ES":
-        rep_ini = """<!DOCTYPE html>
-<html lang='""" + report_var + """'>
-
-<head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Informe realizado con Whatsapp Parser Tool">
-    <meta name="author" content="B16f00t">
-    <link rel="shortcut icon" href="./cfg/logo.png">
-    <title>Whatsapp Parser Tool v""" + version + """ Report Index</title>
-    <!-- Bootstrap core CSS -->
-    <link href="dist/css/bootstrap.css" rel="stylesheet">
-    <!-- Bootstrap theme -->
-    <link href="dist/css/bootstrap-theme.min.css" rel="stylesheet">
-    <!-- Custom styles for this template -->
-    <link href="./cfg/chat.css" rel="stylesheet">
-</head>
-    
-<style>
-table {
-font-family: arial, sans-serif;
-border-collapse: collapse;
-width: 100%;
-}
-td, th {
-border: 1px solid #dddddd;
-text-align: left;
-padding: 8px;
-}
-tr:nth-child(even) {
-background-color: #dddddd;
-}
-#map {
-    height: 100px;
-    width: 100%;
-}
-</style>
-    
-<body  background="./cfg/background-index.png">
-    <!-- Fixed navbar -->
-        <div class="containerindex theme-showcase">
-            <h1 align="left"><img src="./cfg/logo.png" height=128 width=128 align="center">&nbsp;""" + company + """</h1>
-            <h2 align=center> Listado de conversaciones </h2>
-            <div class="header">
-                <table style="width:100%">
-                    """ + obj + """
-                </table>
-            </div>
-        </div>
-<!-- /container -->
-<!-- Bootstrap core JavaScript
-    ================================================== -->
-<!-- Placed at the end of the document so the pages load faster -->
-<script src="https://code.jquery.com/jquery-1.10.2.min.js"></script>
-<script src="dist/js/bootstrap.min.js"></script>
-<script src="docs-assets/js/holder.js"></script>
-</body>
-</html>"""
-
-    elif report_var == "EN":
+    if report_var == "EN":
         rep_ini = """<!DOCTYPE html>
 <html lang='""" + report_var + """'>
 
@@ -513,9 +520,69 @@ background-color: #dddddd;
 </body>
 </html>"""
 
-    f = open(html, 'w', encoding="utf-8")
-    f.write(rep_ini)
-    f.close()
+    elif report_var == "ES":
+        rep_ini = """<!DOCTYPE html>
+<html lang='""" + report_var + """'>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Informe realizado con Whatsapp Parser Tool">
+    <meta name="author" content="B16f00t">
+    <link rel="shortcut icon" href="./cfg/logo.png">
+    <title>Whatsapp Parser Tool v""" + version + """ Report Index</title>
+    <!-- Bootstrap core CSS -->
+    <link href="dist/css/bootstrap.css" rel="stylesheet">
+    <!-- Bootstrap theme -->
+    <link href="dist/css/bootstrap-theme.min.css" rel="stylesheet">
+    <!-- Custom styles for this template -->
+    <link href="./cfg/chat.css" rel="stylesheet">
+</head>
+    
+<style>
+table {
+font-family: arial, sans-serif;
+border-collapse: collapse;
+width: 100%;
+}
+td, th {
+border: 1px solid #dddddd;
+text-align: left;
+padding: 8px;
+}
+tr:nth-child(even) {
+background-color: #dddddd;
+}
+#map {
+    height: 100px;
+    width: 100%;
+}
+</style>
+    
+<body  background="./cfg/background-index.png">
+    <!-- Fixed navbar -->
+        <div class="containerindex theme-showcase">
+            <h1 align="left"><img src="./cfg/logo.png" height=128 width=128 align="center">&nbsp;""" + company + """</h1>
+            <h2 align=center> Listado de conversaciones </h2>
+            <div class="header">
+                <table style="width:100%">
+                    """ + obj + """
+                </table>
+            </div>
+        </div>
+<!-- /container -->
+<!-- Bootstrap core JavaScript
+    ================================================== -->
+<!-- Placed at the end of the document so the pages load faster -->
+<script src="https://code.jquery.com/jquery-1.10.2.min.js"></script>
+<script src="dist/js/bootstrap.min.js"></script>
+<script src="docs-assets/js/holder.js"></script>
+</body>
+</html>"""
+
+    with open(html, 'w', encoding="utf-8") as f:
+        f.write(rep_ini)
 
 
 def reply(id, local):
